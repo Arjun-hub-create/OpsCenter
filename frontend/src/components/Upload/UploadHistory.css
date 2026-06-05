@@ -1,0 +1,71 @@
+.upload-history {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.history-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line3);
+  transition: background 0.15s;
+}
+
+.history-item.clickable { cursor: pointer; }
+.history-item.clickable:hover { background: rgba(0,245,196,0.04); }
+
+.history-icon { font-size: 18px; flex-shrink: 0; }
+
+.history-info { flex: 1; min-width: 0; }
+
+.history-filename {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.history-meta {
+  display: flex;
+  gap: 10px;
+  margin-top: 3px;
+}
+
+.history-time, .history-size {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  color: var(--text-dim);
+  letter-spacing: 0.06em;
+}
+
+.history-delete-btn {
+  background: transparent;
+  border: none;
+  color: var(--danger);
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 3px;
+  transition: all 0.2s;
+  opacity: 0.6;
+}
+
+.history-delete-btn:hover {
+  background: rgba(255, 51, 68, 0.12);
+  color: #fff;
+  opacity: 1;
+  box-shadow: 0 0 6px rgba(255, 51, 68, 0.3);
+}

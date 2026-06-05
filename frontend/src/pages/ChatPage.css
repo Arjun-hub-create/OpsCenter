@@ -1,0 +1,49 @@
+.chat-page {
+  height: 100%;
+  overflow: hidden;
+}
+
+.chat-layout {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 16px;
+  height: calc(100vh - 100px);
+}
+
+.chat-main {
+  height: 100%;
+  overflow: hidden;
+}
+
+.chat-context {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.context-stat {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line3);
+}
+
+.context-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+.context-value {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.context-record {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line3);
+}

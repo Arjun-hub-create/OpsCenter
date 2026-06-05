@@ -1,0 +1,121 @@
+.review-page {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 16px;
+  overflow: hidden;
+}
+
+.review-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  gap: 16px;
+}
+
+.review-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.review-id {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--neon);
+  letter-spacing: 0.1em;
+  text-shadow: var(--glow-neon);
+}
+
+.review-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.review-tab {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  padding: 8px 18px;
+  background: var(--bg2);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s;
+  clip-path: polygon(6px 0%, 100% 0%, calc(100% - 6px) 100%, 0% 100%);
+}
+
+.review-tab:hover { color: var(--text-primary); border-color: var(--neon2); }
+
+.review-tab.active {
+  background: rgba(0,245,196,0.08);
+  border-color: var(--neon);
+  color: var(--neon);
+  text-shadow: 0 0 8px rgba(0,245,196,0.4);
+}
+
+.review-body {
+  flex: 1;
+  overflow: hidden;
+}
+
+.review-split {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  height: 100%;
+}
+
+.review-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.row-switcher {
+  display: flex;
+  gap: 6px;
+  background: var(--bg2);
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px dashed var(--line);
+  margin-top: 8px;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.row-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+  margin-right: 8px;
+}
+
+.row-btn {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  cursor: pointer;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.row-btn:hover {
+  color: var(--neon2);
+  border-color: var(--neon2);
+}
+
+.row-btn.active {
+  background: rgba(0, 245, 196, 0.1);
+  border-color: var(--neon);
+  color: var(--neon);
+}

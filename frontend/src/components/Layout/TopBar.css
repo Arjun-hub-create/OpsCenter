@@ -1,0 +1,81 @@
+.topbar {
+  height: 52px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.topbar::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--neon2), transparent);
+  opacity: 0.4;
+}
+
+.topbar-title {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  color: var(--text-primary);
+}
+
+.topbar-slash {
+  color: var(--neon);
+  text-shadow: var(--glow-neon);
+}
+
+.topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.topbar-clock {
+  color: var(--neon2);
+  letter-spacing: 0.06em;
+}
+
+.topbar-divider {
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+}
+
+.topbar-session {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.session-label {
+  color: var(--text-dim);
+  font-size: 9px;
+  letter-spacing: 0.12em;
+}
+
+.session-id {
+  color: var(--neon);
+  letter-spacing: 0.08em;
+}
+
+.topbar-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}

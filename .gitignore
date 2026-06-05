@@ -1,0 +1,27 @@
+# Python virtual environment
+backend/venv/
+backend/.venv/
+**/__pycache__/
+*.pyc
+
+# Local environment variables & secrets
+backend/.env
+.env
+
+# Database and uploaded files
+backend/uploads/*
+!backend/uploads/.gitkeep
+
+# Node modules and frontend builds
+frontend/node_modules/
+frontend/dist/
+frontend/.cache/
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp

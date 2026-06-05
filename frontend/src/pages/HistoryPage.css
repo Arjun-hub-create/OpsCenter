@@ -1,0 +1,39 @@
+.history-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.history-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.history-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.history-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.history-table-wrap {
+  flex: 1;
+  overflow: hidden;
+}
+
+.history-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-shrink: 0;
+  padding: 8px 0;
+}
