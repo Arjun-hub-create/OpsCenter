@@ -1,9 +1,9 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 import os
+import base64
 
-from database import verify_connection
+from database import verify_connection, uploads
 from routes.upload import router as upload_router
 from routes.extraction import router as extraction_router
 from routes.records import router as records_router
@@ -21,9 +21,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Static file serving for uploads
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+# Serve uploads dynamically (support for read-only serverless filesystems)
+@app.get("/uploads/{stored_name}")
+async def get_uploaded_file(stored_name: str):
+    doc = await uploads.find_one({"stored_name": stored_name})
+    if not doc:
+        # Fallback to local disk files if they exist
+        local_path = os.path.join(UPLOAD_DIR, stored_name)
+        if os.path.exists(local_path):
+            from fastapi.responses import FileResponse
+            return FileResponse(local_path)
+        raise HTTPException(status_code=404, detail="File not found")
+    
+    file_base64 = doc.get("file_base64")
+    if file_base64:
+        try:
+            content = base64.b64decode(file_base64)
+            return Response(content=content, media_type=doc.get("file_type", "application/octet-stream"))
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error decoding file: {e}")
+            
+    local_path = doc.get("file_path", "")
+    if local_path and os.path.exists(local_path):
+        from fastapi.responses import FileResponse
+        return FileResponse(local_path)
+        
+    raise HTTPException(status_code=404, detail="File not found")
 
 # Routers
 app.include_router(upload_router, prefix="/api")

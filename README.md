@@ -120,3 +120,13 @@ You are ready to upload images/PDFs and test the app!
 5. **UI Review Form**: Allows manual correction of low-confidence fields with color-coded confidence bars.
 6. **AI Chat Assistant**: Ask questions about records using plain English in the Chat tab.
 7. **Export to CSV/Excel**: Clean export buttons that style and highlight erroneous rows.
+
+---
+
+## ⚡ Production Deployment (Vercel Monorepo)
+
+I configured the project as a monorepo so that both the React frontend and FastAPI backend can be deployed straight to **Vercel** with one click. 
+
+Because Vercel serverless functions have a read-only filesystem, I changed the upload mechanism to encode the uploads as Base64 and store them directly in MongoDB, so we don't need any local uploads folder!
+
+Check out the detailed instructions in my [Vercel Deployment Guide](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/deployment_guide.md) to get it live!

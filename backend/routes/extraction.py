@@ -53,11 +53,21 @@ async def extract_record(upload_id: str):
     file_path = upload_doc.get("file_path", "")
     mime_type = upload_doc.get("file_type", "image/jpeg")
 
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found on disk")
-
-    with open(file_path, "rb") as f:
-        image_bytes = f.read()
+    file_base64 = upload_doc.get("file_base64")
+    if file_base64:
+        import base64
+        try:
+            image_bytes = base64.b64decode(file_base64)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to decode stored file: {e}")
+    else:
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="File not found on disk")
+        try:
+            with open(file_path, "rb") as f:
+                image_bytes = f.read()
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Failed to read file from disk: {e}")
 
     # Gemini OCR extraction
     extracted = await extract_from_image(image_bytes, mime_type)

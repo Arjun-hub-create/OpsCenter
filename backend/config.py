@@ -9,5 +9,10 @@ MONGODB_URI = os.getenv("MONGODB_URI", "")
 DB_NAME = os.getenv("DB_NAME", "opscenter")
 UPLOAD_DIR = os.getenv("UPLOAD_DIR", "uploads")
 
-# Ensure upload dir exists
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+# Ensure upload dir exists if not on Vercel
+if not os.getenv("VERCEL"):
+    try:
+        os.makedirs(UPLOAD_DIR, exist_ok=True)
+    except Exception as e:
+        print(f"[Config] Warning: Could not create upload directory: {e}")
+

@@ -21,9 +21,11 @@ ALLOWED_TYPES = {
 
 
 def _serialize(doc: dict) -> dict:
+    doc = dict(doc)
     doc["id"] = str(doc.pop("_id"))
     if "upload_time" in doc and hasattr(doc["upload_time"], "isoformat"):
         doc["upload_time"] = doc["upload_time"].isoformat()
+    doc.pop("file_base64", None)
     return doc
 
 
@@ -39,8 +41,15 @@ async def upload_file(file: UploadFile = File(...)):
     file_path = os.path.join(UPLOAD_DIR, unique_name)
 
     contents = await file.read()
-    async with aiofiles.open(file_path, "wb") as f:
-        await f.write(contents)
+    import base64
+    file_base64 = base64.b64encode(contents).decode("utf-8")
+
+    if not os.getenv("VERCEL"):
+        try:
+            async with aiofiles.open(file_path, "wb") as f:
+                await f.write(contents)
+        except Exception as e:
+            print(f"[Upload] Local save failed: {e}")
 
     doc = {
         "filename": file.filename,
@@ -50,6 +59,7 @@ async def upload_file(file: UploadFile = File(...)):
         "file_path": file_path,
         "stored_name": unique_name,
         "size_bytes": len(contents),
+        "file_base64": file_base64,
     }
     result = await uploads.insert_one(doc)
     doc["_id"] = result.inserted_id
@@ -67,8 +77,16 @@ async def upload_bulk(files: list[UploadFile] = File(...)):
         unique_name = f"{uuid.uuid4().hex}{ext}"
         file_path = os.path.join(UPLOAD_DIR, unique_name)
         contents = await file.read()
-        async with aiofiles.open(file_path, "wb") as f:
-            await f.write(contents)
+        import base64
+        file_base64 = base64.b64encode(contents).decode("utf-8")
+
+        if not os.getenv("VERCEL"):
+            try:
+                async with aiofiles.open(file_path, "wb") as f:
+                    await f.write(contents)
+            except Exception as e:
+                print(f"[Upload Bulk] Local save failed: {e}")
+
         doc = {
             "filename": file.filename,
             "file_type": file.content_type,
@@ -77,6 +95,7 @@ async def upload_bulk(files: list[UploadFile] = File(...)):
             "file_path": file_path,
             "stored_name": unique_name,
             "size_bytes": len(contents),
+            "file_base64": file_base64,
         }
         result = await uploads.insert_one(doc)
         doc["_id"] = result.inserted_id

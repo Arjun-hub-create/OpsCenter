@@ -8,12 +8,15 @@ This document describes the complete working of the OpsCenter AI project from be
 
 ```
 opscenter/
+├── api/
+│   ├── index.py             # Vercel serverless entrypoint
+│   └── requirements.txt     # Python requirements copy for Vercel
 ├── backend/
-│   ├── main.py              # FastAPI startup & router inclusions
-│   ├── config.py            # Environment configurations (API keys & upload paths)
+│   ├── main.py              # FastAPI startup, routing, and dynamic upload endpoint
+│   ├── config.py            # Environment configurations (Vercel overrides)
 │   ├── database.py          # MongoDB client connection details
 │   ├── routes/              # FastAPI controllers (routing layer)
-│   │   ├── upload.py        # File ingestion & upload tracking
+│   │   ├── upload.py        # File ingestion (Base64 encoding & MongoDB save)
 │   │   ├── extraction.py    # OCR triggers, date propagation, & record saving
 │   │   ├── records.py       # Manual reviews, audit trail, exports (CSV/Excel)
 │   │   ├── dashboard.py     # MongoDB aggregate charts & stats
@@ -23,22 +26,21 @@ opscenter/
 │       ├── groq_service.py       # Llama 3.3 chat, suggestions, & anomaly logic
 │       ├── validation_service.py # Deterministic Python rules engine
 │       └── anomaly_service.py    # Statistical outlier calculations
-└── frontend/
-    ├── index.html           # Single Page Application root
-    ├── src/
-    │   ├── api.js           # Central Axios HTTP client definitions
-    │   ├── index.css        # Global CSS dark HUD design system
-    │   ├── pages/           # Page controllers (views)
-    │   │   ├── UploadPage.jsx
-    │   │   ├── ReviewPage.jsx
-    │   │   ├── HistoryPage.jsx
-    │   │   ├── DashboardPage.jsx
-    │   │   └── ChatPage.jsx
-    │   └── components/      # Reusable widgets
-    │       ├── Upload/      # DropZone & UploadHistory
-    │       ├── Extraction/  # ConfidenceBar & ExtractionPanel
-    │       ├── Review/      # ReviewForm
-    │       └── Dashboard/   # ShiftChart & MachineTable
+├── frontend/
+│   ├── index.html           # Single Page Application root
+│   ├── src/
+│   │   ├── api.js           # Central Axios HTTP client definitions
+│   │   ├── index.css        # Global CSS dark HUD design system
+│   │   ├── pages/           # Page controllers (views)
+│   │   │   ├── UploadPage.jsx
+│   │   │   ├── ReviewPage.jsx
+│   │   │   ├── HistoryPage.jsx
+│   │   │   ├── DashboardPage.jsx
+│   │   │   └── ChatPage.jsx
+│   │   └── components/      # Reusable widgets
+│   └── vercel.json          # Frontend-specific vercel fallback rules
+├── package.json             # Root monorepo package.json for Vercel build
+└── vercel.json              # Root Vercel monorepo routing config
 ```
 
 ---
@@ -75,13 +77,16 @@ The connection between the React client and the FastAPI server is established vi
   ```
   This white-lists the Vite frontend server origins to resolve standard browser cross-origin requests.
 
-### 3. Backend Static Upload Files Mount
+### 3. Backend Dynamic Serverless Upload serving
 * **Folder/File**: [backend/main.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/main.py)
-* **Line 26**: Connects static file storage serving:
+* **Line 25-49**: Serves file uploads dynamically to support Vercel's read-only filesystem:
   ```python
-  app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+  @app.get("/uploads/{stored_name}")
+  async def get_uploaded_file(stored_name: str):
+      doc = await uploads.find_one({"stored_name": stored_name})
+      # Decodes and returns base64 content from MongoDB, or falls back to disk locally
   ```
-  This mounts the local backend disk folder `uploads` to the network endpoint `/uploads`, allowing the frontend React images and PDF iframes (e.g. inside `ExtractionPanel.jsx`) to directly request and display uploaded document previews.
+  This maps the network endpoint `/uploads/{stored_name}` dynamically. It queries the `uploads` collection, decodes the Base64 representation to binary bytes, and returns it with the correct `media_type`, enabling the frontend images and PDF previews to load seamlessly in serverless environments.
 
 ---
 
@@ -95,9 +100,11 @@ The connection between the React client and the FastAPI server is established vi
 * **Axios API Client**: `frontend/src/api.js`
   - **Line 17–21**: `uploadFile` maps the upload to `POST /upload`.
 * **Backend Endpoint**: `backend/routes/upload.py`
-  - **Line 30**: `@router.post("/upload")` receives the file.
-  - **Line 42**: `async with aiofiles.open(file_path, "wb") as f:` saves the physical document to the `backend/uploads/` folder.
-  - **Line 54**: `result = await uploads.insert_one(doc)` inserts the record with `"status": "pending"` into the MongoDB `uploads` collection.
+  - **Line 32**: `@router.post("/upload")` receives the file.
+  - **Line 43-45**: `base64.b64encode(contents).decode("utf-8")` encodes the uploaded file content.
+  - **Line 47-52**: Saves to disk only if not running on Vercel (`if not os.getenv("VERCEL")`).
+  - **Line 54-63**: Creates `doc` including the `file_base64` field.
+  - **Line 64**: `result = await uploads.insert_one(doc)` inserts the record with `"status": "pending"` into the MongoDB `uploads` collection.
 
 ---
 
@@ -107,7 +114,7 @@ The connection between the React client and the FastAPI server is established vi
 * **Axios API Client**: `frontend/src/api.js`
   - **Line 29–30**: `getUploads` triggers `GET /uploads`.
 * **Backend Endpoint**: `backend/routes/upload.py`
-  - **Line 87–95**: `get_uploads()` queries the MongoDB `uploads` collection, sorting by `upload_time` descending (`uploads.find({}).sort("upload_time", -1)`).
+  - **Line 106–114**: `get_uploads()` queries the MongoDB `uploads` collection, sorting by `upload_time` descending (`uploads.find({}).sort("upload_time", -1)`). Large `file_base64` fields are removed dynamically during serialization to optimize response speed.
 
 ---
 
@@ -117,10 +124,10 @@ The connection between the React client and the FastAPI server is established vi
 * **Axios API Client**: `frontend/src/api.js`
   - **Line 76**: `deleteUpload` triggers `DELETE /uploads/{id}`.
 * **Backend Endpoint**: `backend/routes/upload.py`
-  - **Line 109**: `@router.delete("/uploads/{upload_id}")`
-  - **Line 124**: `os.remove(file_path)` deletes the physical JPEG/PNG/PDF file from the disk.
-  - **Line 129**: `await uploads.delete_one({"_id": oid})` deletes the upload record.
-  - **Line 132**: `await records.delete_many({"upload_id": upload_id})` purges all parsed rows from MongoDB.
+  - **Line 128**: `@router.delete("/uploads/{upload_id}")`
+  - **Line 141**: `os.remove(file_path)` deletes the physical file from disk if present (fails silently in read-only Vercel environment).
+  - **Line 146**: `await uploads.delete_one({"_id": oid})` deletes the upload record.
+  - **Line 149**: `await records.delete_many({"upload_id": upload_id})` purges all parsed rows from MongoDB.
 
 ---
 
@@ -130,7 +137,8 @@ The connection between the React client and the FastAPI server is established vi
 * **Axios API Client**: `frontend/src/api.js`
   - **Line 34–35**: `extractRecord` triggers `POST /extract/{upload_id}`.
 * **Backend Endpoint**: `backend/routes/extraction.py`
-  - **Line 44**: `@router.post("/extract/{upload_id}")`
+  - **Line 45**: `@router.post("/extract/{upload_id}")`
+  - **Line 56-60**: Decodes file content directly from the MongoDB `file_base64` field if available, falling back to reading from disk.
   - **Line 63**: `extracted = await extract_from_image(image_bytes, mime_type)` calls the vision models.
 
 ---
