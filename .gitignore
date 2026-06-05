@@ -25,3 +25,5 @@ frontend/.cache/
 *.njsproj
 *.sln
 *.swp
+
+.vercel
