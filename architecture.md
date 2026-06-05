@@ -43,6 +43,48 @@ opscenter/
 
 ---
 
+## 🔌 Frontend-Backend Connection Details
+
+The connection between the React client and the FastAPI server is established via three configuration points:
+
+### 1. Vite Development Proxy Configuration
+* **Folder/File**: [frontend/vite.config.js](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/frontend/vite.config.js)
+* **Line 6-12**: Maps the frontend dev server (`http://localhost:5173`) proxy targets:
+  ```javascript
+  server: {
+    port: 5173,
+    proxy: {
+      '/api': 'http://localhost:8000',
+      '/uploads': 'http://localhost:8000',
+    }
+  }
+  ```
+  This automatically redirects any frontend AJAX request starting with `/api` or static image query starting with `/uploads` to the FastAPI backend running on port `8000` without triggering CORS browser blocks.
+
+### 2. FastAPI Cross-Origin Resource Sharing (CORS) Middleware
+* **Folder/File**: [backend/main.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/main.py)
+* **Line 16-22**: Defines backend security configurations allowing origins to connect:
+  ```python
+  app.add_middleware(
+      CORSMiddleware,
+      allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+      allow_credentials=True,
+      allow_methods=["*"],
+      allow_headers=["*"],
+  )
+  ```
+  This white-lists the Vite frontend server origins to resolve standard browser cross-origin requests.
+
+### 3. Backend Static Upload Files Mount
+* **Folder/File**: [backend/main.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/main.py)
+* **Line 26**: Connects static file storage serving:
+  ```python
+  app.mount("/uploads", StaticFiles(directory=UPLOAD_DIR), name="uploads")
+  ```
+  This mounts the local backend disk folder `uploads` to the network endpoint `/uploads`, allowing the frontend React images and PDF iframes (e.g. inside `ExtractionPanel.jsx`) to directly request and display uploaded document previews.
+
+---
+
 ## ⚙️ Detailed Execution Sequence (17 Functional Flows)
 
 ---
