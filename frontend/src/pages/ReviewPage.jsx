@@ -102,8 +102,9 @@ export default function ReviewPage() {
     }
   }
 
+  const backendUrl = import.meta.env.VITE_API_URL || ''
   const imageUrl = upload?.stored_name
-    ? `/uploads/${upload.stored_name}`
+    ? `${backendUrl}/uploads/${upload.stored_name}`
     : null
 
   if (loading) return (
