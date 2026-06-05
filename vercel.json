@@ -1,28 +1,19 @@
 {
+  "framework": null,
+  "outputDirectory": "frontend/dist",
   "cleanUrls": true,
   "rewrites": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.py"
+      "source": "/api/:path*",
+      "destination": "/api/index"
     },
     {
-      "source": "/uploads/(.*)",
-      "destination": "/api/index.py"
+      "source": "/uploads/:path*",
+      "destination": "/api/index"
     },
     {
-      "source": "/(.*)",
+      "source": "/((?!api/|uploads/).*)",
       "destination": "/index.html"
     }
-  ],
-  "experimentalServices": {
-    "frontend": {
-      "entrypoint": "frontend",
-      "routePrefix": "/",
-      "framework": "vite"
-    },
-    "backend": {
-      "entrypoint": "backend",
-      "routePrefix": "/_/backend"
-    }
-  }
+  ]
 }
