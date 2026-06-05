@@ -1,147 +1,214 @@
-# OpsCenter AI — System Architecture & Data Flow
+# OpsCenter AI — Precise System Architecture & Code Map
 
-This document maps out the end-to-end data flow of the project. It describes exactly what happens when a document is uploaded, how the AI extracts it, how validations and date context propagation are run, how database records are updated during manual review, and lists the exact folder names, file names, functions, and line numbers.
+This document describes the complete working of the OpsCenter AI project from beginning to end, mapping every core functionality in sequence. It details the connection between the React (Vite) frontend and the FastAPI (Python) backend, specifying the folder names, file names, functions, exact line numbers, and code snippets.
 
 ---
 
-## 🗺️ System Data Flow Overview
+## 📂 Project Structure Directory Map
 
 ```
-[Browser UI: DropZone] --(File Upload)--> [FastAPI: /upload] --> Save to disk & MongoDB Uploads
-                                                │
-[Browser UI: UploadPage] --(Extract Req)--> [FastAPI: /extract/{id}]
-                                                │
-                                                ▼ (gemini_service.py)
-                                        [Gemini 1.5 OCR Vision] -> returns raw JSON
-                                                │
-                                                ▼ (extraction.py)
-                                        [Date Context Propagation] (completes short dates like 22/4 -> 22/4/26)
-                                                │
-                                                ▼ (extraction.py)
-                                        [_clean_quantity] (normalizes dashes and -1 to None)
-                                                │
-                                                ▼ (validation_service.py)
-                                        [Python Validation Rules] -> normalizes shift (1 -> I), validates formats
-                                                │
-                                                ▼ (groq_service.py / anomaly_service.py)
-                                        [Groq AI Anomaly Checks & Auto-Correct suggestions]
-                                                │
-                                                ▼
-                                        Save to MongoDB Records collection
-                                                │
-[Browser UI: ReviewForm] --(Save Form)--> [FastAPI: /records/{id}] -> Re-run Validation & Update DB
+opscenter/
+├── backend/
+│   ├── main.py              # FastAPI startup & router inclusions
+│   ├── config.py            # Environment configurations (API keys & upload paths)
+│   ├── database.py          # MongoDB client connection details
+│   ├── routes/              # FastAPI controllers (routing layer)
+│   │   ├── upload.py        # File ingestion & upload tracking
+│   │   ├── extraction.py    # OCR triggers, date propagation, & record saving
+│   │   ├── records.py       # Manual reviews, audit trail, exports (CSV/Excel)
+│   │   ├── dashboard.py     # MongoDB aggregate charts & stats
+│   │   └── chat.py          # Groq AI chat routing
+│   └── services/            # Core business & AI logic
+│       ├── gemini_service.py     # Gemini Flash 1.5 Vision OCR service
+│       ├── groq_service.py       # Llama 3.3 chat, suggestions, & anomaly logic
+│       ├── validation_service.py # Deterministic Python rules engine
+│       └── anomaly_service.py    # Statistical outlier calculations
+└── frontend/
+    ├── index.html           # Single Page Application root
+    ├── src/
+    │   ├── api.js           # Central Axios HTTP client definitions
+    │   ├── index.css        # Global CSS dark HUD design system
+    │   ├── pages/           # Page controllers (views)
+    │   │   ├── UploadPage.jsx
+    │   │   ├── ReviewPage.jsx
+    │   │   ├── HistoryPage.jsx
+    │   │   ├── DashboardPage.jsx
+    │   │   └── ChatPage.jsx
+    │   └── components/      # Reusable widgets
+    │       ├── Upload/      # DropZone & UploadHistory
+    │       ├── Extraction/  # ConfidenceBar & ExtractionPanel
+    │       ├── Review/      # ReviewForm
+    │       └── Dashboard/   # ShiftChart & MachineTable
 ```
 
 ---
 
-## 🛠️ Step-by-Step Execution Sequence
-
-Here is the exact code sequence for every phase of the project:
-
-### 1. Document Upload & Ingestion
-* **Trigger Point (Frontend)**:
-  - **Folder/File**: [frontend/src/components/Upload/DropZone.jsx](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/frontend/src/components/Upload/DropZone.jsx)
-  - **Function**: Uses Axios to POST the document file.
-* **API Client Mapping**:
-  - **Folder/File**: [frontend/src/api.js](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/frontend/src/api.js)
-  - **Line 17**: `export const uploadFile = (formData, onProgress) => api.post('/upload', formData, ...)` maps the UI request to the backend `/api/upload` endpoint.
-* **Ingestion Route (Backend)**:
-  - **Folder/File**: [backend/routes/upload.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/upload.py)
-  - **Line 30**: `@router.post("/upload")` defines the endpoint.
-  - **Line 41**: Reads the incoming file content.
-  - **Line 42**: Saves the file under a unique UUID string into the `backend/uploads/` directory on disk.
-  - **Line 45-54**: Inserts a new upload record in the MongoDB `uploads` collection containing `filename`, `stored_name` (UUID), `file_type`, `size_bytes`, and status `"pending"`.
-  - **Line 56**: Returns a `201 Created` JSON payload containing the upload ID.
+## ⚙️ Detailed Execution Sequence (17 Functional Flows)
 
 ---
 
-### 2. OCR OCR Extraction
-* **Trigger Point (Frontend)**:
-  - **Folder/File**: [frontend/src/pages/UploadPage.jsx](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/frontend/src/pages/UploadPage.jsx)
-  - **Line 14**: `handleUploaded` triggers immediately after the upload completes, calling the extraction API.
-* **API Client Mapping**:
-  - **Folder/File**: [frontend/src/api.js](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/frontend/src/api.js)
-  - **Line 34**: `export const extractRecord = uploadId => api.post(\`/extract/\${uploadId}\`)` sends the request.
-* **OCR Route (Backend)**:
-  - **Folder/File**: [backend/routes/extraction.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/extraction.py)
-  - **Line 44**: `@router.post("/extract/{upload_id}")` defines the extraction controller.
-  - **Line 47**: Retrieves the upload document from MongoDB (`uploads` collection).
-  - **Line 63**: `extracted = await extract_from_image(image_bytes, mime_type)` executes the AI OCR query.
-* **Gemini Service**:
-  - **Folder/File**: [backend/services/gemini_service.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/services/gemini_service.py)
-  - **Line 66**: `async def extract_from_image(image_bytes, mime_type)` constructs the prompt (`EXTRACTION_PROMPT` at line 22) demanding structured JSON with fields, raw text, and confidence scores, and calls the Google Gemini API.
+### Flow 1: Document Upload Ingestion
+* **Frontend Controller**: `frontend/src/components/Upload/DropZone.jsx`
+  - **Line 45**: `const result = await uploadFile(fd, setProgress)` compiles the selected image/PDF into `FormData` and posts it.
+* **Axios API Client**: `frontend/src/api.js`
+  - **Line 17–21**: `uploadFile` maps the upload to `POST /upload`.
+* **Backend Endpoint**: `backend/routes/upload.py`
+  - **Line 30**: `@router.post("/upload")` receives the file.
+  - **Line 42**: `async with aiofiles.open(file_path, "wb") as f:` saves the physical document to the `backend/uploads/` folder.
+  - **Line 54**: `result = await uploads.insert_one(doc)` inserts the record with `"status": "pending"` into the MongoDB `uploads` collection.
 
 ---
 
-### 3. Year Context Propagation
-To handle handwritten shortcuts where later rows omit the year (e.g., date written as `22/4` below a full row showing `22/4/26`), the backend propagates the year context *before* running validations.
-* **Processing logic**:
-  - **Folder/File**: [backend/routes/extraction.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/extraction.py)
-  - **Line 74-90**: Loops through the Gemini extracted rows to identify the first complete 3-part date (e.g., `22/4/26` or `2026-04-22`) and captures the year (e.g. `26` or `2026`).
-  - **Line 92-104**: If no row has a year, it falls back to scanning the `raw_text` for any complete date strings, or defaults to the last two digits of the current year (e.g., `"26"`).
-  - **Line 106-123**: Loops back through all rows. If a row has a partial 2-part date (e.g., `22/4` matching `^\d{1,2}/\d{1,2}$`), it appends the separator and the year to make it complete (e.g., `22/4/26`), allowing it to pass parsing.
+### Flow 2: Upload History List
+* **Frontend Controller**: `frontend/src/components/Upload/UploadHistory.jsx`
+  - **Line 19**: `const data = await getUploads(1, 30)` loads recent documents on mount.
+* **Axios API Client**: `frontend/src/api.js`
+  - **Line 29–30**: `getUploads` triggers `GET /uploads`.
+* **Backend Endpoint**: `backend/routes/upload.py`
+  - **Line 87–95**: `get_uploads()` queries the MongoDB `uploads` collection, sorting by `upload_time` descending (`uploads.find({}).sort("upload_time", -1)`).
 
 ---
 
-### 4. Cleanup & Data Validation Pipeline
-* **Quantity Normalisation**:
-  - **Folder/File**: [backend/routes/extraction.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/extraction.py)
-  - **Line 143**: `record_doc["quantity_produced"] = _clean_quantity(...)` normalises dash artifacts.
-  - **Line 17-27**: `_clean_quantity` takes values like `"-1"` (common OCR misread of a dash `—` in empty quantity cells) or `nil` and converts them to `None`.
-* **Deterministic Rules Engine**:
-  - **Folder/File**: [backend/routes/extraction.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/extraction.py)
-  - **Line 146**: `py_errors = await run_all_validations(record_doc)` runs the rules pipeline.
-  - **Folder/File**: [backend/services/validation_service.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/services/validation_service.py)
-  - **Line 194**: `async def run_all_validations(record, exclude_id)` executes validation rules:
-    - **Line 54 (`validate_date`)**: Checks if date parses against `DATE_FORMATS` after zero-padding.
-    - **Line 83 (`validate_shift`)**: Validates shift inputs. normalizes shifts like `"1"` or `"A"` to canonical Roman numerals `"I"`, `"II"`, `"III"`.
-    - **Line 97 (`validate_machine_code`)**: Checks if machine number matches `MC-XXX` (2-4 digits, case-insensitive, ignores spaces).
-    - **Line 126 (`validate_quantity`)**: Checks that quantity is a number between 1 and 10000. Treats dashes or blank fields as valid zero production.
-    - **Line 156 (`validate_work_order`)**: Ensures work order number is present.
-    - **Line 163 (`validate_time_taken`)**: Verifies time is a number between 0.1 and 24 hours.
-    - **Line 180 (`check_duplicate_work_order`)**: Queries MongoDB collection `records` to ensure no other document already has this work order number.
+### Flow 3: Delete Upload & Clean Up Records
+* **Frontend Controller**: `frontend/src/components/Upload/UploadHistory.jsx`
+  - **Line 46**: `await deleteUpload(uploadId)` triggers deletion of the whole upload group.
+* **Axios API Client**: `frontend/src/api.js`
+  - **Line 76**: `deleteUpload` triggers `DELETE /uploads/{id}`.
+* **Backend Endpoint**: `backend/routes/upload.py`
+  - **Line 109**: `@router.delete("/uploads/{upload_id}")`
+  - **Line 124**: `os.remove(file_path)` deletes the physical JPEG/PNG/PDF file from the disk.
+  - **Line 129**: `await uploads.delete_one({"_id": oid})` deletes the upload record.
+  - **Line 132**: `await records.delete_many({"upload_id": upload_id})` purges all parsed rows from MongoDB.
 
 ---
 
-### 5. Anomaly Detection & AI Suggestions
-* **Rules Anomaly Checks**:
-  - **Folder/File**: [backend/routes/extraction.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/extraction.py)
-  - **Line 155**: `anomaly_flags = await run_anomaly_checks(record_doc)` calls basic anomaly calculations in [backend/services/anomaly_service.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/services/anomaly_service.py) (e.g. quantity spikes compared to historical shift averages).
-* **Groq AI Anomaly Checks**:
-  - **Folder/File**: [backend/routes/extraction.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/extraction.py)
-  - **Line 161**: `groq_anomalies = await detect_anomalies(record_doc, hist_avg)` queries Groq Llama-3.3.
-  - **Folder/File**: [backend/services/groq_service.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/services/groq_service.py)
-  - **Line 109**: `async def detect_anomalies(record_dict, historical_avg)` performs semantic comparisons.
-* **Auto-Correction Suggestions**:
-  - **Folder/File**: [backend/routes/extraction.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/extraction.py)
-  - **Line 176**: `generate_correction_suggestion(field, ...)` is called for low-confidence OCR fields.
-  - **Folder/File**: [backend/services/groq_service.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/services/groq_service.py)
-  - **Line 83**: `generate_correction_suggestion()` provides single-word replacement suggestions.
+### Flow 4: OCR Extraction Request
+* **Frontend Controller**: `frontend/src/pages/UploadPage.jsx`
+  - **Line 19**: `await extractRecord(upload.id)` triggers right after a file is uploaded.
+* **Axios API Client**: `frontend/src/api.js`
+  - **Line 34–35**: `extractRecord` triggers `POST /extract/{upload_id}`.
+* **Backend Endpoint**: `backend/routes/extraction.py`
+  - **Line 44**: `@router.post("/extract/{upload_id}")`
+  - **Line 63**: `extracted = await extract_from_image(image_bytes, mime_type)` calls the vision models.
 
 ---
 
-### 6. Persistence & Client Response
-* **Database Save**:
-  - **Folder/File**: [backend/routes/extraction.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/extraction.py)
-  - **Line 185**: `result = await records.insert_one(record_doc)` saves the record to the `records` collection.
-  - **Line 190**: Updates the upload document status in `uploads` collection to `"extracted"`.
-  - **Line 192**: Returns the serialised record to the frontend (which handles navigation to `/review/{upload_id}`).
+### Flow 5: Google Gemini 1.5 Flash Vision OCR
+* **Backend Service**: `backend/services/gemini_service.py`
+  - **Line 66**: `async def extract_from_image(image_bytes, mime_type)`
+  - **Line 73**: `response = gemini_model.generate_content([EXTRACTION_PROMPT, image_part])` uses Gemini Flash to read the handwriting.
+  - **Line 86**: `extract_via_groq_vision(...)` serves as the fallback if Gemini hits rate limits.
 
 ---
 
-### 7. Manual Review & Records Update
-When the user edits values in the Review page and clicks "Save Record":
-* **Trigger Point (Frontend)**:
-  - **Folder/File**: [frontend/src/components/Review/ReviewForm.jsx](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/frontend/src/components/Review/ReviewForm.jsx)
-  - **Function**: Collects modified form input values and submits.
-* **API Client Mapping**:
-  - **Folder/File**: [frontend/src/api.js](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/frontend/src/api.js)
-  - **Line 45**: `export const updateRecord = (id, data) => api.put(\`/records/\${id}\`, data)` triggers the PUT request.
-* **Backend Update Route**:
-  - **Folder/File**: [backend/routes/records.py](file:///c:/Users/arjun/Downloads/Documents/opscenter/opscenter/backend/routes/records.py)
+### Flow 6: Date Context Propagation (Edge Cases)
+Handles partial dates like `22/4` by copying the year `26` from elsewhere on the page.
+* **Backend Processor**: `backend/routes/extraction.py`
+  - **Line 74–90**: Loops through all extracted rows to find the first complete 3-part date and extracts the year.
+  - **Line 92–104**: If not found in rows, searches the raw OCR text for a year, defaulting to the current year.
+  - **Line 106–123**: Loops back through all rows, appending the year context to any partial 2-part dates (e.g. `22/4` $\rightarrow$ `22/4/26`) so they pass date-format parsing.
+
+---
+
+### Flow 7: OCR Dash Artifact Cleaning
+* **Backend Processor**: `backend/routes/extraction.py`
+  - **Line 143**: `record_doc["quantity_produced"] = _clean_quantity(...)` cleans field data.
+  - **Line 17–27**: `_clean_quantity()` converts values like `"-1"` (common misread of dashes in handwritten tables) to `None`, indicating blank production.
+
+---
+
+### Flow 8: Deterministic Validation Rules
+* **Backend Service**: `backend/services/validation_service.py`
+  - **Line 194**: `async def run_all_validations(record, exclude_id)` runs Python rules:
+    - **Line 54**: `validate_date()` checks formats like `DD/MM/YY` against `DATE_FORMATS` list.
+    - **Line 83**: `validate_shift()` maps raw input like `"1"` or `"A"` to canonical Roman numerals `"I"`, `"II"`, `"III"`.
+    - **Line 97**: `validate_machine_code()` enforces formatting using regex pattern `MC-\d{2,4}`.
+    - **Line 126**: `validate_quantity()` validates numeric boundaries ($1 \le Q \le 10000$).
+    - **Line 180**: `check_duplicate_work_order()` checks MongoDB collection `records` for duplicates.
+
+---
+
+### Flow 9: Anomaly Detection Checks
+* **Backend Service**: `backend/services/anomaly_service.py`
+  - **Line 155 in `extraction.py`**: Calls `run_anomaly_checks(record_doc)`.
+  - Checks if quantity is $>3\times$ the historical average of the shift, or if an employee is booked on 3+ machines.
+* **Groq AI Service**: `backend/services/groq_service.py`
+  - **Line 109**: `async def detect_anomalies(record_dict, historical_avg)` asks Groq Llama 3.3 to flag semantic irregularities against historical metrics.
+
+---
+
+### Flow 10: Auto-Correction suggestions
+* **Backend Service**: `backend/services/groq_service.py`
+  - **Line 83**: `async def generate_correction_suggestion(field_name, value)`
+  - Triggered in `extraction.py` line 176 for fields with low confidence ($<0.5$). Groq returns a correction recommendation displayed in the Review Form.
+
+---
+
+### Flow 11: DB Record Saving
+* **Backend Processor**: `backend/routes/extraction.py`
+  - **Line 185**: `result = await records.insert_one(record_doc)` saves the validated document.
+  - **Line 190**: `await uploads.update_one({"_id": ObjectId(upload_id)}, {"$set": {"status": "extracted"}})` marks the document status as extracted.
+
+---
+
+### Flow 12: Loading Records for Manual Review
+* **Frontend Controller**: `frontend/src/pages/ReviewPage.jsx`
+  - **Line 28**: `const res = await getRecords({ upload_id: uploadId, limit: 100 })` fetches all rows associated with the document.
+* **Axios API Client**: `frontend/src/api.js`
+  - **Line 40–41**: `getRecords` triggers `GET /records`.
+* **Backend Endpoint**: `backend/routes/records.py`
+  - **Line 37–73**: `get_records()` filters and returns matching records.
+
+---
+
+### Flow 13: Manual Edit & Form Saving (With Audit Logs)
+* **Frontend Controller**: `frontend/src/components/Review/ReviewForm.jsx`
+  - **Line 49**: `const updated = await updateRecord(record.id, form)` posts manual changes.
+* **Axios API Client**: `frontend/src/api.js`
+  - **Line 45–46**: `updateRecord` triggers `PUT /records/{id}`.
+* **Backend Endpoint**: `backend/routes/records.py`
   - **Line 175**: `@router.put("/records/{record_id}")` receives the payload.
-  - **Line 189-202**: Compares the incoming payload with existing fields in DB. If a field value changed, it logs an entry in `audit_entries` showing the field, original value, corrected value, and timestamp.
-  - **Line 206**: `py_errors = await run_all_validations(merged, exclude_id=record_id)` re-evaluates deterministic validation rules using the new values.
-  - **Line 210-216**: Marks the record as reviewed (`"reviewed": True`), sets `review_time`, and appends new audit trail entries to the `audit_trail` list.
-  - **Line 218**: `await records.update_one({"_id": oid}, {"$set": update_fields})` commits the changes to MongoDB.
-  - **Line 228**: Returns the updated record back to the React UI to update the table immediately.
+  - **Line 189–202**: Audits changes. If a value differs from DB, creates an audit log entry in `audit_entries`.
+  - **Line 206**: `py_errors = await run_all_validations(merged, exclude_id=record_id)` re-runs validations on edited data.
+  - **Line 218**: `await records.update_one({"_id": oid}, {"$set": update_fields})` updates the DB.
+
+---
+
+### Flow 14: History Records Table
+* **Frontend Page**: `frontend/src/pages/HistoryPage.jsx`
+  - **Line 34**: `const data = await getRecords(params)` queries records using search, shift, and status filters.
+* **Backend Endpoint**: `backend/routes/records.py`
+  - **Line 37–73**: `get_records()` returns filter queries and handles pagination skip limits.
+
+---
+
+### Flow 15: AI Chat Q&A Interaction
+* **Frontend Component**: `frontend/src/components/Chat/AiChat.jsx`
+  - **Line 48**: `const data = await sendChatMessage(msg)` posts a message.
+* **Axios API Client**: `frontend/src/api.js`
+  - **Line 51–52**: `sendChatMessage` maps to `POST /chat`.
+* **Backend Endpoint**: `backend/routes/chat.py`
+  - **Line 19**: `@router.post("/chat")`
+  - **Line 27**: `async for doc in records.find({}).sort("created_at", -1).limit(100)` fetches the last 100 records to build the AI's training context.
+  - **Line 43**: `response = await chat_with_records(message, records_context)` sends the request to the Groq service.
+
+---
+
+### Flow 16: Dashboard Statistics & Chart Feeds
+* **Frontend Page**: `frontend/src/pages/DashboardPage.jsx`
+  - **Line 17**: `const data = await getDashboardStats()` fetches charts and aggregates.
+* **Backend Endpoint**: `backend/routes/dashboard.py`
+  - **Line 8**: `@router.get("/dashboard/stats")`
+  - **Line 18–31**: Runs MongoDB aggregate pipeline `records.aggregate(...)` to group and count shift totals.
+  - **Line 34–54**: Groups machine stats and computes failure rates.
+  - **Line 57–63**: Runs daily upload metrics for the past 7 days.
+
+---
+
+### Flow 17: CSV and Excel Exports
+* **Frontend Page**: `frontend/src/pages/HistoryPage.jsx`
+  - **Line 55**: Calls `exportCSV()`.
+  - **Line 61**: Calls `exportExcel()`.
+* **Backend Endpoint**: `backend/routes/records.py`
+  - **Line 76**: `@router.get("/records/export/csv")` writes records to a CSV string and streams it back.
+  - **Line 110**: `@router.get("/records/export/excel")` uses `openpyxl` to build and stream color-coded Excel sheets.
