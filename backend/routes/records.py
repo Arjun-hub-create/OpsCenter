@@ -49,7 +49,9 @@ async def get_records(
     if upload_id:
         query["upload_id"] = upload_id
     if shift:
-        query["shift.value"] = shift.upper()
+        from services.validation_service import normalize_shift
+        norm = normalize_shift(shift)
+        query["shift.value"] = (norm or shift).upper()
     if search:
         query["$or"] = [
             {"work_order_number.value": {"$regex": search, "$options": "i"}},
@@ -189,6 +191,11 @@ async def update_record(record_id: str, body: dict):
     for field in FIELD_NAMES:
         if field in body:
             new_val = body[field]
+            if field == "shift":
+                from services.validation_service import normalize_shift
+                norm = normalize_shift(new_val)
+                if norm:
+                    new_val = norm
             original = existing.get(field, {})
             original_val = original.get("value") if isinstance(original, dict) else original
             if str(new_val) != str(original_val):

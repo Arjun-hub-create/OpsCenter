@@ -149,6 +149,15 @@ async def extract_record(upload_id: str):
         for field in FIELD_NAMES:
             record_doc[field] = row.get(field, {"value": None, "confidence": 0.0})
 
+        # Normalise shift value to canonical Roman numerals
+        from services.validation_service import normalize_shift
+        shift_data = record_doc.get("shift", {})
+        if isinstance(shift_data, dict):
+            raw_shift = shift_data.get("value")
+            norm_shift = normalize_shift(raw_shift)
+            if norm_shift:
+                shift_data["value"] = norm_shift
+
         # Clean up OCR artifacts: dashes misread as "-1" in quantity
         record_doc["quantity_produced"] = _clean_quantity(record_doc.get("quantity_produced", {}))
 
