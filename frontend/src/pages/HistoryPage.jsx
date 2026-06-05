@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getRecords, exportCSV, exportExcel } from '../api'
 import './HistoryPage.css'
@@ -20,34 +20,62 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [filters, setFilters] = useState({ shift: '', status: '', search: '' })
+  const [searchInput, setSearchInput] = useState('')
   const [exporting, setExporting] = useState(false)
   const navigate = useNavigate()
+  const abortRef = useRef(null)
   const LIMIT = 20
 
-  const load = async (p = page, f = filters) => {
+  const load = useCallback(async (p, f) => {
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
     setLoading(true)
     try {
       const params = { page: p, limit: LIMIT }
       if (f.shift) params.shift = f.shift
       if (f.status) params.status = f.status
       if (f.search) params.search = f.search
-      const data = await getRecords(params)
-      setRecords(data.records || [])
-      setTotal(data.total || 0)
+      const data = await getRecords(params, controller.signal)
+      if (!controller.signal.aborted) {
+        setRecords(data.records || [])
+        setTotal(data.total || 0)
+      }
     } catch (e) {
-      console.error(e)
+      if (e.name !== 'AbortError' && e.name !== 'CanceledError') {
+        console.error(e)
+      }
     } finally {
-      setLoading(false)
+      if (!controller.signal.aborted) {
+        setLoading(false)
+      }
     }
-  }
+  }, [])
 
-  useEffect(() => { load(page, filters) }, [page])
+  useEffect(() => {
+    load(page, filters)
+    return () => abortRef.current?.abort()
+  }, [page, filters, load])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFilters(prev => {
+        if (prev.search === searchInput) return prev
+        setPage(1)
+        return { ...prev, search: searchInput }
+      })
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchInput])
 
   const handleFilter = (key, val) => {
-    const next = { ...filters, [key]: val }
-    setFilters(next)
+    if (key === 'search') {
+      setSearchInput(val)
+      return
+    }
+    setFilters(prev => ({ ...prev, [key]: val }))
     setPage(1)
-    load(1, next)
   }
 
   const handleExportCSV = async () => {
@@ -72,7 +100,7 @@ export default function HistoryPage() {
             className="field-input"
             style={{ width: 200 }}
             placeholder="Search records..."
-            value={filters.search}
+            value={searchInput}
             onChange={e => handleFilter('search', e.target.value)}
           />
           <select className="field-input" style={{ width: 120 }} value={filters.shift} onChange={e => handleFilter('shift', e.target.value)}>

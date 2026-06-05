@@ -1,7 +1,6 @@
 {
   "framework": null,
   "outputDirectory": "frontend/dist",
-  "cleanUrls": true,
   "rewrites": [
     {
       "source": "/api/:path*",
@@ -12,7 +11,7 @@
       "destination": "/api/index"
     },
     {
-      "source": "/((?!api/|uploads/).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ]

@@ -37,8 +37,8 @@ export const extractRecord = uploadId =>
 export const getExtraction = uploadId =>
   api.get(`/extract/${uploadId}`).then(r => r.data)
 
-export const getRecords = (filters = {}) =>
-  api.get('/records', { params: filters }).then(r => r.data)
+export const getRecords = (filters = {}, signal) =>
+  api.get('/records', { params: filters, signal }).then(r => r.data)
 
 export const getRecord = id => api.get(`/records/${id}`).then(r => r.data)
 

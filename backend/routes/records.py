@@ -1,5 +1,6 @@
 import io
 import csv
+import re
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import StreamingResponse
@@ -10,6 +11,11 @@ import openpyxl
 from openpyxl.styles import PatternFill, Font
 
 router = APIRouter()
+
+
+def _escape_regex(value: str) -> str:
+    return re.escape(value.strip())
+
 
 FIELD_NAMES = ["date", "shift", "employee_number", "operation_code",
                "machine_number", "work_order_number", "quantity_produced", "time_taken"]
@@ -53,12 +59,23 @@ async def get_records(
         norm = normalize_shift(shift)
         query["shift.value"] = (norm or shift).upper()
     if search:
-        query["$or"] = [
-            {"work_order_number.value": {"$regex": search, "$options": "i"}},
-            {"machine_number.value": {"$regex": search, "$options": "i"}},
-            {"employee_number.value": {"$regex": search, "$options": "i"}},
-            {"operation_code.value": {"$regex": search, "$options": "i"}},
-        ]
+        term = _escape_regex(search)
+        if term:
+            or_clauses = [
+                {"work_order_number.value": {"$regex": term, "$options": "i"}},
+                {"machine_number.value": {"$regex": term, "$options": "i"}},
+                {"employee_number.value": {"$regex": term, "$options": "i"}},
+                {"operation_code.value": {"$regex": term, "$options": "i"}},
+                {"date.value": {"$regex": term, "$options": "i"}},
+                {"quantity_produced.value": {"$regex": term, "$options": "i"}},
+                {"$expr": {"$regexMatch": {"input": {"$toString": "$_id"}, "regex": term, "options": "i"}}},
+            ]
+            if re.fullmatch(r"[a-fA-F0-9]{24}", search.strip()):
+                try:
+                    or_clauses.append({"_id": ObjectId(search.strip())})
+                except Exception:
+                    pass
+            query["$or"] = or_clauses
     if status:
         if status == "reviewed":
             query["reviewed"] = True
